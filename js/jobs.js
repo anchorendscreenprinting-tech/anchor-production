@@ -2,6 +2,7 @@ import { createJob, updateJob, deleteJob, getJob, watchJobs, createNotification 
 import { session } from "./auth.js";
 import { STAGES, STAGE_COLOURS } from "./config.js";
 import { renderInkPicker, checkLowInks, loadInkState } from "./ink.js";
+import { showMockupModal } from "./mockup.js";
 
 let _jobs = [];
 let _customers = [];
@@ -242,6 +243,69 @@ export function renderJobDetail(job, container, onUpdate) {
         ${job.inkColours ? `<div class="ink-colours-note">Ink colours: ${job.inkColours}</div>` : ""}
       </div>
 
+      <!-- Mockup: send button (stage 1 only, no mockup sent yet or changes requested) -->
+      ${job.stage === 1 ? `
+        <div class="detail-section">
+          <h3 class="detail-section-title">Mockup</h3>
+          <p class="detail-helper">Send the client a mockup for approval. They'll receive an email with a link to review and approve it.</p>
+          <button class="btn btn-primary" id="send-mockup-btn">Send mockup →</button>
+        </div>
+      ` : ""}
+
+      <!-- Mockup: approved or changes_requested panel -->
+      ${job.mockup?.status === "approved" ? `
+        <div class="detail-section">
+          <h3 class="detail-section-title">Mockup</h3>
+          <div class="mockup-approved-banner">
+            ✓ Approved${job.mockup.approvedByClient ? ` by ${job.mockup.approvedByClient}` : " by client"}
+            ${job.mockup.approvedAt ? ` · ${formatDate(job.mockup.approvedAt)}` : ""}
+          </div>
+          ${job.mockup.imageUrl ? `<img class="mockup-image" src="${job.mockup.imageUrl}" alt="Approved mockup">` : ""}
+          ${job.mockup.notes ? `<div class="mockup-notes">${job.mockup.notes}</div>` : ""}
+        </div>
+      ` : job.mockup?.status === "changes_requested" ? `
+        <div class="detail-section">
+          <h3 class="detail-section-title">Mockup</h3>
+          <div class="mockup-changes-banner">
+            ↩ Changes requested${job.mockup.changesRequestedBy ? ` by ${job.mockup.changesRequestedBy}` : ""}
+            ${job.mockup.changesRequestedAt ? ` · ${formatDate(job.mockup.changesRequestedAt)}` : ""}
+            ${job.mockup.clientMessage ? `<div class="mockup-changes-msg">"${job.mockup.clientMessage}"</div>` : ""}
+          </div>
+          ${job.mockup.imageUrl ? `<img class="mockup-image" src="${job.mockup.imageUrl}" alt="Mockup (changes requested)">` : ""}
+          ${job.stage === 1 ? `<div style="margin-top:12px"><button class="btn btn-primary btn-sm" id="send-mockup-btn">Send revised mockup →</button></div>` : ""}
+        </div>
+      ` : ""}
+
+      <!-- Mockup send log -->
+      ${job.mockupSendLog?.length ? `
+        <div class="detail-section">
+          <h3 class="detail-section-title">Mockup send history</h3>
+          <div class="send-log">
+            ${job.mockupSendLog.map(e => `
+              <div class="send-log-row">
+                <span class="send-log-to">${e.sentTo ?? "—"}</span>
+                <span class="send-log-meta">${e.via === "mailto" ? "via email app" : "via Anchor End"} · ${formatDate(e.sentAt)}</span>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      ` : ""}
+
+      <!-- Checked against mockup (stage >= 2 with approved mockup) -->
+      ${job.stage >= 2 && job.mockup?.status === "approved" ? `
+        <div class="detail-section">
+          <div class="mockup-check-row">
+            <label class="mockup-check-label">
+              <input type="checkbox" id="mockup-checked" ${job.mockup?.checkedBy ? "checked disabled" : ""}>
+              Checked against mockup before printing
+            </label>
+            ${job.mockup?.checkedBy ? `
+              <span class="mockup-check-meta">by ${job.mockup.checkedBy} · ${formatDate(job.mockup.checkedAt)}</span>
+            ` : ""}
+          </div>
+        </div>
+      ` : ""}
+
       <!-- Financials -->
       <div class="detail-section">
         <h3 class="detail-section-title">Quote</h3>
@@ -379,6 +443,32 @@ export function renderJobDetail(job, container, onUpdate) {
       }
     });
   }
+
+  // Send mockup button (stage 1 only)
+  document.getElementById("send-mockup-btn")?.addEventListener("click", () => {
+    showMockupModal(job, onUpdate);
+  });
+
+  // Checked against mockup checkbox
+  document.getElementById("mockup-checked")?.addEventListener("change", async (e) => {
+    if (e.target.checked) {
+      e.target.disabled = true;
+      try {
+        await updateJob(job.id, {
+          mockup: {
+            ...job.mockup,
+            checkedBy: session.user,
+            checkedAt: new Date().toISOString(),
+          },
+        });
+        onUpdate();
+      } catch (err) {
+        e.target.disabled = false;
+        e.target.checked = false;
+        alert("Failed to save: " + err.message);
+      }
+    }
+  });
 }
 
 // ── Job create/edit form ──────────────────────────────────────────────────────

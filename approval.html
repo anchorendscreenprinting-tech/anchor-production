@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mockup Approval — Anchor End Studios</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: #f2f0eb;
+      color: #0a0a0a;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header */
+    .header {
+      background: #0a0a0a;
+      padding: 16px 24px;
+      border-bottom: 3px solid #c8102e;
+    }
+    .header-brand {
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      color: #f2f0eb;
+      text-transform: uppercase;
+    }
+    .header-sub {
+      font-size: 10px;
+      color: rgba(242,240,235,0.4);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    /* Container */
+    .wrap {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 32px 20px 60px;
+    }
+
+    /* Loading / error states */
+    .state-card {
+      background: #fff;
+      border: 1px solid #dedad2;
+      border-radius: 8px;
+      padding: 40px 32px;
+      text-align: center;
+      margin-top: 24px;
+    }
+    .state-icon { font-size: 40px; margin-bottom: 16px; }
+    .state-title { font-size: 20px; font-weight: 700; margin-bottom: 10px; }
+    .state-body  { font-size: 14px; color: #666; line-height: 1.7; }
+
+    /* Approved / changes state */
+    .responded-banner {
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .responded-banner.approved  { background: #dcfce7; border: 1px solid #86efac; }
+    .responded-banner.changes   { background: #fef9c3; border: 1px solid #fde047; }
+    .responded-banner-icon { font-size: 24px; flex-shrink: 0; }
+    .responded-banner-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .responded-banner-body  { font-size: 13px; color: #444; line-height: 1.6; }
+
+    /* Mockup image */
+    .mockup-section { margin-bottom: 28px; }
+    .mockup-img {
+      width: 100%;
+      height: auto;
+      display: block;
+      border: 1px solid #dedad2;
+      border-radius: 6px;
+    }
+
+    /* Job info */
+    .info-section {
+      background: #fff;
+      border: 1px solid #dedad2;
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+    }
+    .info-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: #9a9590;
+      margin-bottom: 10px;
+    }
+    .info-row { display: flex; gap: 8px; flex-wrap: wrap; font-size: 13px; color: #333; line-height: 1.7; }
+    .info-key { color: #9a9590; min-width: 80px; }
+
+    /* Notes */
+    .notes-box {
+      background: #e8e6e1;
+      border-left: 3px solid #c8102e;
+      padding: 12px 16px;
+      border-radius: 0 4px 4px 0;
+      margin-bottom: 24px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #333;
+    }
+    .notes-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: #9a9590;
+      margin-bottom: 6px;
+    }
+
+    /* Action buttons */
+    .action-section { margin-bottom: 24px; }
+    .action-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; }
+    .action-btns {
+      display: flex;
+      gap: 12px;
+    }
+    @media (max-width: 500px) { .action-btns { flex-direction: column; } }
+    .btn {
+      flex: 1;
+      padding: 14px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      text-align: center;
+      transition: opacity .15s;
+    }
+    .btn:hover  { opacity: .85; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-approve  { background: #16a34a; color: #fff; }
+    .btn-changes  { background: #fff; color: #0a0a0a; border: 2px solid #ccc; }
+    .btn-submit   { background: #c8102e; color: #fff; }
+    .btn-back     { background: none; color: #666; border: none; cursor: pointer; font-size: 13px; margin-bottom: 16px; padding: 0; text-decoration: underline; }
+
+    /* Confirmation form */
+    .confirm-section { display: none; }
+    .confirm-section.active { display: block; }
+    .field-label { font-size: 12px; font-weight: 600; margin-bottom: 6px; display: block; color: #333; }
+    .field-hint  { font-size: 11px; color: #9a9590; margin-bottom: 4px; }
+    input[type=text], textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      background: #fff;
+      color: #0a0a0a;
+      margin-bottom: 16px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input[type=text]:focus, textarea:focus { border-color: #c8102e; }
+    textarea { resize: vertical; min-height: 90px; }
+
+    /* Footer */
+    .footer {
+      background: #0a0a0a;
+      padding: 16px 24px;
+      text-align: center;
+      font-size: 10px;
+      color: rgba(242,240,235,0.3);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-brand">Anchor End Studios</div>
+  <div class="header-sub">Mockup Approval</div>
+</header>
+
+<div class="wrap" id="root">
+  <div class="state-card">
+    <div class="state-icon">⏳</div>
+    <div class="state-title">Loading…</div>
+  </div>
+</div>
+
+<footer class="footer">
+  Anchor End Studios · Arch 32, Aspin Lane, Manchester M4 4DW
+</footer>
+
+<script>
+(function () {
+  const FIREBASE_API_KEY  = "AIzaSyCSnbQhjLvdwDNg9mTKaOW1gWvVUx8zmws";
+  const FIREBASE_PROJECT  = "ink-stock-318c0";
+  const WORKER_URL        = "https://anchor-end-enquiry-handler.anchorendscreenprinting.workers.dev";
+  const root = document.getElementById("root");
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  function esc(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return "";
+    return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  }
+
+  // Read a Firestore REST field value
+  function fsVal(field) {
+    if (!field) return null;
+    if ("stringValue"    in field) return field.stringValue;
+    if ("integerValue"   in field) return parseInt(field.integerValue, 10);
+    if ("timestampValue" in field) return field.timestampValue;
+    if ("nullValue"      in field) return null;
+    return null;
+  }
+
+  // ── Fetch approval doc from Firestore REST API ────────────────────────────────
+
+  async function fetchApproval(token) {
+    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents/job_approvals/${encodeURIComponent(token)}?key=${FIREBASE_API_KEY}`;
+    const res = await fetch(url);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Firestore error ${res.status}`);
+    const doc = await res.json();
+    const f = doc.fields ?? {};
+    return {
+      token:         fsVal(f.token),
+      jobId:         fsVal(f.jobId),
+      status:        fsVal(f.status),
+      imageUrl:      fsVal(f.imageUrl),
+      notes:         fsVal(f.notes),
+      sentTo:        fsVal(f.sentTo),
+      customerName:  fsVal(f.customerName),
+      quoteRef:      fsVal(f.quoteRef),
+      sentAt:        fsVal(f.sentAt),
+      respondedAt:   fsVal(f.respondedAt),
+      clientName:    fsVal(f.clientName),
+      clientMessage: fsVal(f.clientMessage),
+    };
+  }
+
+  // ── Render states ─────────────────────────────────────────────────────────────
+
+  function renderError(title, body) {
+    root.innerHTML = `
+      <div class="state-card">
+        <div class="state-icon">⚠</div>
+        <div class="state-title">${esc(title)}</div>
+        <div class="state-body">${esc(body)}</div>
+      </div>`;
+  }
+
+  function renderAlreadyResponded(approval) {
+    const isApproved = approval.status === "approved";
+    root.innerHTML = `
+      <div class="responded-banner ${isApproved ? "approved" : "changes"}">
+        <div class="responded-banner-icon">${isApproved ? "✓" : "↩"}</div>
+        <div>
+          <div class="responded-banner-title">
+            ${isApproved ? "You approved this mockup" : "You requested changes"}
+          </div>
+          <div class="responded-banner-body">
+            ${approval.respondedAt ? "Responded on " + esc(fmtDate(approval.respondedAt)) : ""}
+            ${approval.clientName ? " · " + esc(approval.clientName) : ""}
+            ${approval.clientMessage ? "<br><em>\"" + esc(approval.clientMessage) + "\"</em>" : ""}
+          </div>
+        </div>
+      </div>
+      ${approval.imageUrl ? `
+        <div class="mockup-section">
+          <img class="mockup-img" src="${esc(approval.imageUrl)}" alt="Mockup">
+        </div>` : ""}
+      <div class="state-card" style="margin-top:0;">
+        <div class="state-body">
+          Your response has been received. Anchor End Studios will be in touch soon.
+          <br><br>
+          Questions? Email <a href="mailto:contact@anchorend.co.uk" style="color:#c8102e;">contact@anchorend.co.uk</a>
+        </div>
+      </div>`;
+  }
+
+  function renderApprovalUI(approval) {
+    const firstName = (approval.customerName || "").split(" ")[0] || "there";
+
+    root.innerHTML = `
+      ${approval.imageUrl ? `
+        <div class="mockup-section">
+          <img class="mockup-img" src="${esc(approval.imageUrl)}" alt="Your mockup">
+        </div>` : ""}
+
+      ${approval.notes ? `
+        <div class="notes-box">
+          <div class="notes-label">Print notes</div>
+          ${esc(approval.notes)}
+        </div>` : ""}
+
+      ${approval.quoteRef || approval.customerName ? `
+        <div class="info-section">
+          <div class="info-label">Your order</div>
+          <div class="info-row">
+            ${approval.quoteRef ? `<span class="info-key">Ref</span><span>${esc(approval.quoteRef)}</span>` : ""}
+          </div>
+        </div>` : ""}
+
+      <!-- Step 1: choose -->
+      <div id="step-choose" class="action-section">
+        <div class="action-title">Hi ${esc(firstName)} — are you happy with this mockup?</div>
+        <div class="action-btns">
+          <button class="btn btn-approve" id="btn-approve">✓ Approve</button>
+          <button class="btn btn-changes" id="btn-changes">↩ Request changes</button>
+        </div>
+      </div>
+
+      <!-- Step 2a: confirm approval -->
+      <div id="step-approve" class="confirm-section">
+        <button class="btn-back" id="back-from-approve">← Back</button>
+        <div class="action-title">Confirm approval</div>
+        <label class="field-label">Your name (optional)</label>
+        <input type="text" id="approve-name" placeholder="e.g. Jane Smith">
+        <button class="btn btn-approve" id="btn-confirm-approve" style="width:100%">Confirm approval →</button>
+      </div>
+
+      <!-- Step 2b: request changes -->
+      <div id="step-changes" class="confirm-section">
+        <button class="btn-back" id="back-from-changes">← Back</button>
+        <div class="action-title">Request changes</div>
+        <label class="field-label">What would you like changed? <span style="color:#c8102e">*</span></label>
+        <textarea id="changes-message" placeholder="e.g. Please increase the text size and move the logo slightly lower"></textarea>
+        <label class="field-label">Your name (optional)</label>
+        <input type="text" id="changes-name" placeholder="e.g. Jane Smith">
+        <button class="btn btn-submit" id="btn-confirm-changes" style="width:100%">Send changes request →</button>
+      </div>
+    `;
+
+    // Navigation
+    document.getElementById("btn-approve").addEventListener("click", () => {
+      document.getElementById("step-choose").style.display = "none";
+      document.getElementById("step-approve").classList.add("active");
+      document.getElementById("approve-name").focus();
+    });
+    document.getElementById("btn-changes").addEventListener("click", () => {
+      document.getElementById("step-choose").style.display = "none";
+      document.getElementById("step-changes").classList.add("active");
+      document.getElementById("changes-message").focus();
+    });
+    document.getElementById("back-from-approve").addEventListener("click", () => {
+      document.getElementById("step-choose").style.display = "";
+      document.getElementById("step-approve").classList.remove("active");
+    });
+    document.getElementById("back-from-changes").addEventListener("click", () => {
+      document.getElementById("step-choose").style.display = "";
+      document.getElementById("step-changes").classList.remove("active");
+    });
+
+    // Submit approval
+    document.getElementById("btn-confirm-approve").addEventListener("click", () => {
+      const name = document.getElementById("approve-name").value.trim();
+      submitResponse(approval.token, "approved", name, "", approval);
+    });
+
+    // Submit changes
+    document.getElementById("btn-confirm-changes").addEventListener("click", () => {
+      const msg  = document.getElementById("changes-message").value.trim();
+      const name = document.getElementById("changes-name").value.trim();
+      if (!msg) {
+        document.getElementById("changes-message").style.borderColor = "#c8102e";
+        document.getElementById("changes-message").focus();
+        return;
+      }
+      submitResponse(approval.token, "changes_requested", name, msg, approval);
+    });
+  }
+
+  // ── Submit response to Worker ─────────────────────────────────────────────────
+
+  async function submitResponse(token, status, clientName, clientMessage, approval) {
+    // Disable all buttons
+    root.querySelectorAll("button").forEach(b => { b.disabled = true; });
+
+    try {
+      const res = await fetch(`${WORKER_URL}/approval-respond`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, status, clientName, clientMessage }),
+      });
+      const data = await res.json();
+
+      if (data.alreadyResponded || data.error === "already_responded") {
+        renderAlreadyResponded({ ...approval, status, respondedAt: new Date().toISOString() });
+        return;
+      }
+      if (!data.ok) throw new Error(data.error || "Unknown error");
+
+      // Show success
+      renderAlreadyResponded({
+        ...approval,
+        status,
+        respondedAt: new Date().toISOString(),
+        clientName,
+        clientMessage,
+      });
+    } catch (err) {
+      root.querySelectorAll("button").forEach(b => { b.disabled = false; });
+      alert("Something went wrong: " + err.message + "\n\nPlease try again or email contact@anchorend.co.uk");
+    }
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────────────
+
+  async function boot() {
+    const params = new URLSearchParams(window.location.search);
+    const token  = params.get("token");
+
+    if (!token) {
+      renderError("Invalid link", "This approval link is incomplete. Please check your email and try the button again.");
+      return;
+    }
+
+    try {
+      const approval = await fetchApproval(token);
+
+      if (!approval) {
+        renderError("Link not found", "This approval link is not valid. It may have expired or been used already.\n\nPlease contact Anchor End Studios if you need a new link.");
+        return;
+      }
+
+      if (approval.status !== "pending") {
+        renderAlreadyResponded(approval);
+        return;
+      }
+
+      renderApprovalUI(approval);
+    } catch (err) {
+      renderError("Something went wrong", "Could not load your mockup. Please refresh and try again, or email contact@anchorend.co.uk");
+      console.error(err);
+    }
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

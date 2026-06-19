@@ -326,6 +326,80 @@ a { color: var(--accent); text-decoration: none; }
 .size-form-cell label { font-size: 11px; color: var(--text-3); font-weight: 700; text-transform: uppercase; }
 .size-form-cell input { width: 100%; text-align: center; padding: 8px 4px; }
 
+/* ── Mockup UI ─────────────────────────────────────────────────────────────── */
+.detail-helper {
+  font-size: 13px; color: var(--text-2); margin-bottom: 14px; line-height: 1.6;
+}
+
+.mockup-approved-banner {
+  background: var(--green-dim); border: 1px solid #4ade8040;
+  color: var(--green); border-radius: var(--radius-sm);
+  padding: 10px 14px; font-size: 13px; font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.mockup-changes-banner {
+  background: #f5a62320; border: 1px solid #f5a62340;
+  color: var(--accent); border-radius: var(--radius-sm);
+  padding: 10px 14px; font-size: 13px; font-weight: 600;
+  margin-bottom: 12px;
+}
+.mockup-changes-msg {
+  font-weight: 400; color: var(--text-2); margin-top: 4px;
+  font-size: 13px; font-style: italic;
+}
+
+.mockup-image {
+  width: 100%; max-height: 400px; object-fit: contain;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-2); display: block; margin-bottom: 10px;
+}
+
+.mockup-notes {
+  font-size: 12px; color: var(--text-2); padding: 8px 12px;
+  background: var(--surface-2); border-radius: var(--radius-sm);
+}
+
+/* Send log */
+.send-log { display: flex; flex-direction: column; gap: 6px; }
+.send-log-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; background: var(--surface-2); border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.send-log-to { color: var(--text); }
+.send-log-meta { color: var(--text-3); font-size: 12px; }
+
+/* Checked against mockup */
+.mockup-check-row {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 16px; background: var(--surface-2);
+  border-radius: var(--radius-sm); border: 1px solid var(--border);
+}
+.mockup-check-label {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 14px; color: var(--text); cursor: pointer; font-weight: 500;
+}
+.mockup-check-label input[type=checkbox] {
+  width: 18px; height: 18px; accent-color: var(--green); cursor: pointer; flex-shrink: 0;
+}
+.mockup-check-meta { font-size: 12px; color: var(--text-3); }
+
+/* Uploadcare wrap */
+.uploadcare-wrap { margin-bottom: 4px; }
+.uploadcare-wrap .uploadcare-widget { width: 100%; }
+
+/* Mockup preview in modal */
+.mockup-preview-row {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 10px;
+}
+.mockup-thumb {
+  width: 80px; height: 80px; object-fit: cover;
+  border-radius: var(--radius-sm); border: 1px solid var(--border);
+}
+.mockup-thumb-label { font-size: 12px; color: var(--text-2); }
+
 /* ── Responsive ────────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   #nav { padding: 0 12px; gap: 8px; }
