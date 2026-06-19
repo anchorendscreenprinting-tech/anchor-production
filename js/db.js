@@ -11,7 +11,7 @@ const app = initializeApp(FIREBASE_CONFIG);
 // ── App Check (monitoring mode — enforcement is OFF until all apps verified) ──
 // Replace the placeholder below with your reCAPTCHA v3 site key from Google.
 initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider("REPLACE_WITH_RECAPTCHA_V3_SITE_KEY"),
+  provider: new ReCaptchaV3Provider("6LfKLigtAAAAAHWbxkMRhjXyzUN_4JY-fraJIJbk"),
   isTokenAutoRefreshEnabled: true,
 });
 
