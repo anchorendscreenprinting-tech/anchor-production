@@ -1,11 +1,20 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { initializeApp }                          from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc,
   updateDoc, deleteDoc, onSnapshot, query, orderBy, where, serverTimestamp, arrayUnion,
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { FIREBASE_CONFIG, INK_LIB_DOC } from "./config.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
+import { FIREBASE_CONFIG, INK_LIB_DOC }           from "./config.js";
 
 const app = initializeApp(FIREBASE_CONFIG);
+
+// ── App Check (monitoring mode — enforcement is OFF until all apps verified) ──
+// Replace the placeholder below with your reCAPTCHA v3 site key from Google.
+initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider("REPLACE_WITH_RECAPTCHA_V3_SITE_KEY"),
+  isTokenAutoRefreshEnabled: true,
+});
+
 export const db = getFirestore(app);
 
 // ── Collection refs ──────────────────────────────────────────────────────────
