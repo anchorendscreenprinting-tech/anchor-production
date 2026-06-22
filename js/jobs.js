@@ -4,6 +4,10 @@ import { STAGES, STAGE_COLOURS } from "./config.js";
 import { renderInkPicker, checkLowInks, loadInkState } from "./ink.js";
 import { showMockupModal } from "./mockup.js";
 
+// ── Anchor End HQ (Mockup Maker) deploy URL ───────────────────────────────────
+// The "Open in Mockup Maker" button deep-links to HQ with ?job=<this job's id>.
+const HQ_URL = "https://anchorendhq.netlify.app";
+
 let _jobs = [];
 let _customers = [];
 let _onJobsChange = null;
@@ -247,8 +251,9 @@ export function renderJobDetail(job, container, onUpdate) {
       ${job.stage === 1 ? `
         <div class="detail-section">
           <h3 class="detail-section-title">Mockup</h3>
-          <p class="detail-helper">Send the client a mockup for approval. They'll receive an email with a link to review and approve it.</p>
-          <button class="btn btn-primary" id="send-mockup-btn">Send mockup →</button>
+          <p class="detail-helper">Build the proof in the Mockup Maker — it sends the approval email and saves the PDF here. Or upload an image and send it manually.</p>
+          <a class="btn btn-primary" href="${HQ_URL}/?job=${job.id}" target="_blank" rel="noopener">Open in Mockup Maker →</a>
+          <button class="btn btn-ghost" id="send-mockup-btn" style="margin-top:6px">Send a mockup image manually</button>
         </div>
       ` : ""}
 
