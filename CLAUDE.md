@@ -1,0 +1,63 @@
+# CLAUDE.md — Anchor End Studios software ecosystem
+
+This file gives Claude Code the standing context for this project. Read it before starting work. It exists so the setup, decisions, and hard-won gotchas don't have to be rediscovered each session.
+
+## Who / what this is
+
+Anchor End Studios is a premium screen-printing business (Manchester). This is a custom software ecosystem built to reduce admin burden. The core goal: systems that let a small team input data, so the owner isn't the bottleneck. Prefer fewer apps, not sprawl.
+
+## The apps (three live apps, one shared Firebase project)
+
+All are **vanilla JS, loaded via CDN imports, no build step, no package.json**. They share one Firebase project: **`ink-stock-318c0`** (storageBucket: `ink-stock-318c0.firebasestorage.app` — NOT the `.appspot.com` name, which is dead).
+
+- **anchor-hq** (`anchorendhq.netlify.app`) — the admin hub. Quotes, enquiries inbox, and the Mockup Studio. This is where the owner works.
+- **anchor-production** (`anchor-production.netlify.app`) — the production job board (stages: Quote accepted → Invoice sent → Garments ordered → Artwork received → Artwork separated → Screens made → Inks mixed). Holds the send/approve flow and `approval.html`. Separate repo, deployed separately (manual push).
+- **ink-library** (`anchorendstudios.netlify.app`) — floor ink stock app.
+
+A retired prototype, **anchor-end** (React + FastAPI/SQLite), is decommissioned and fully severed from Firebase. It is the **source of truth for proven logic** when porting features — read it, port the logic, re-implement the data layer on Firebase. Do not reinvent what already works there.
+
+Other infra: Netlify (hosting), a Cloudflare Worker (`anchor-end-enquiry-handler`) that handles enquiry submissions and the mockup send/approve email via Resend. **The Worker's source is not in any of these repos** — it's deployed separately and can't be edited from here.
+
+## Architecture principles
+
+- **Fewer apps, not sprawl.** New features go into existing apps. All share one Firebase project.
+- **Check real data shapes before building.** Report the actual structure of a doc/collection before writing code against it. Do not assume field names or formats — this has caused repeated bugs.
+- **Staged builds with stop-and-test gates.** Build in layers, confirm each works before the next. Don't do large features in one pass.
+- **Port, don't reinvent.** The retired anchor-end prototype holds proven logic; port it, only rewriting the data layer for Firebase.
+- **Report before building** when reconciling two systems or when a decision has real consequences.
+
+## Hard-won gotchas (do not relearn these)
+
+- **reCAPTCHA / Safari ITP:** Safari's Intelligent Tracking Prevention blocks reCAPTCHA, which breaks App Check–gated uploads in Safari only. Staff send mockups from **Chrome**. Customers only *view* the public approval image (a plain `<img>`), unaffected by ITP on any browser. The reCAPTCHA key itself is fine — don't chase the key when the real cause is the browser.
+- **App Check state:** App Check (reCAPTCHA v3) is in **monitoring mode for Firestore** (logs but does not block) and **enforced on Storage** (the `mockups/` storage rule requires `request.app != null`). Storage is the first place App Check is genuinely enforced.
+- **Firebase Storage is the image host** — NOT Uploadcare. Uploadcare is broken on this project (uploads 404). Images go to Firebase Storage under `mockups/{jobId}/`, public read, App Check–gated write.
+- **Firestore + Storage are both secured** but apps use **PIN login, not Firebase Auth** — so `request.auth` is always null. Rules gate on App Check (`request.app`), not auth. (Adopting Firebase Auth is a planned future upgrade.)
+- **Mockup calibration uses native Konva stage scale**, NOT CSS `transform: scale()`. CSS transform broke drag-coordinate mapping and calibration input — native stage scale keeps display size and measurement independent.
+- **White-on-dark pricing rule:** "white on dark" = single colour white, one screen, double-hit. It does NOT add an extra screen — must NOT use `cols+1` logic.
+- **Disk space (`ENOSPC`):** the error is on Claude Code's small **task-output scratch mount** (where command stdout/stderr is captured), NOT the main disk — the volume itself has plenty free (~147 GB). Two fixes: (1) try `export CLAUDE_CODE_TMPDIR=~/Documents/claude-tmp` (and `mkdir -p` it) before launching; (2) if that doesn't fully resolve it, the reliable workaround is to **redirect a command's output to a file on the repo disk and read that file** (e.g. `cmd > .out.txt 2>&1` then read `.out.txt`) instead of relying on captured stdout.
+
+## Mockup Studio (in anchor-hq) — current state
+
+A full mockup maker built fresh in vanilla JS (ported from the anchor-end React prototype). Capabilities: four garment views (front/back/L sleeve/R sleeve); template-photo, flat-colour SVG, and upload-your-own-photo garment modes; photo-mode calibration (amber side-seam handles = horizontal scale; green top-hem + bottom-hem = vertical scale, independent; collar is artwork-placement-only, NOT calibration); diagonal sleeve calibration (top seam / underarm / cuff); artwork sized on a single scale to preserve true proportions; left/right breast snapping (wearer-correct: front view is mirrored, back view is not); Pantone search + eyedropper match (1,431 colours in `js/pantone-data.js`, plus plain White/Black); multi-position proof session with per-position independent state; PDF proof export (jsPDF, styling kept in a clearly-separated theme block for easy future redesign) with an editable measurement-override review step before generating.
+
+**Pipeline:** from a job at "Invoice sent", open the maker → build proof → the proof's pages render to a single stacked PNG (the customer approval image, showing the full proof) → uploaded to Firebase Storage → fed to the existing send/approve flow → customer approves on `approval.html` → job advances to "Garments ordered", approved mockup saved on the card, dual HQ+production notifications, "checked against mockup" staff tick. Full PDF saved separately as `job.mockup.pdfUrl`.
+
+## Parked / on the horizon
+
+- **Garment template library** — upload & save reusable blank garment photos (HQ-only, photo-only, recalibrate each use), built on Firebase Storage. Comes after the mockup pipeline.
+- **App Check enforcement on Firestore** — currently monitoring only. Before enforcing: `approval.html` (uses REST API, no SDK token) and the Cloudflare Worker (server-side, can't do reCAPTCHA) must be handled first.
+- **Firebase Auth** across all apps — the proper long-term security upgrade (replaces client-side PINs; makes standard auth-based rules possible).
+- **Enquiry form changes** — delivery vs collection, date-needed carry-through.
+- **Holding page** — to go live once design is finalised.
+- **Other HQ modules** — stock ordering, screen management rebuild in Firebase, garment prices in Firebase.
+
+## Build conventions the owner prefers
+
+- Thorough scoping via questions first, then a complete spec to Claude Code.
+- One thing at a time; stop-and-test between stages.
+- Report real data shapes / current state before building, not after.
+- Test before trusting live. A correct earlier refusal or check shouldn't be undone by impatience.
+
+## Visual identity
+
+Orange accent `#f5a623` is the HQ app's identity. (A professional full redesign of everything is planned for the near future — keep styling cleanly separated so it's a swap, not a rewrite.)
