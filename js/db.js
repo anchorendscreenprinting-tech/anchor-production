@@ -3,15 +3,16 @@ import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc,
   updateDoc, deleteDoc, onSnapshot, query, orderBy, where, serverTimestamp, arrayUnion,
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app-check.js";
 import { FIREBASE_CONFIG, INK_LIB_DOC }           from "./config.js";
 
 const app = initializeApp(FIREBASE_CONFIG);
 
-// ── App Check (monitoring mode — enforcement is OFF until all apps verified) ──
-// Replace the placeholder below with your reCAPTCHA v3 site key from Google.
+// ── App Check — reCAPTCHA Enterprise. The shared key is an Enterprise key, so the
+// client MUST use ReCaptchaEnterpriseProvider; ReCaptchaV3Provider 403s against it
+// (it calls the classic exchangeRecaptchaV3Token endpoint). See CLAUDE.md gotcha. ──
 initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider("6LfKLigtAAAAAHWbxkMRhjXyzUN_4JY-fraJIJbk"),
+  provider: new ReCaptchaEnterpriseProvider("6LfKLigtAAAAAHWbxkMRhjXyzUN_4JY-fraJIJbk"),
   isTokenAutoRefreshEnabled: true,
 });
 
