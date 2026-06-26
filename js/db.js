@@ -12,7 +12,7 @@ const app = initializeApp(FIREBASE_CONFIG);
 // client MUST use ReCaptchaEnterpriseProvider; ReCaptchaV3Provider 403s against it
 // (it calls the classic exchangeRecaptchaV3Token endpoint). See CLAUDE.md gotcha. ──
 initializeAppCheck(app, {
-  provider: new ReCaptchaEnterpriseProvider("6LfKLigtAAAAAHWbxkMRhjXyzUN_4JY-fraJIJbk"),
+  provider: new ReCaptchaEnterpriseProvider("6Ld4XjYtAAAAAEYX8id8iyw-18TnsujbLQ55yTuN"),
   isTokenAutoRefreshEnabled: true,
 });
 
