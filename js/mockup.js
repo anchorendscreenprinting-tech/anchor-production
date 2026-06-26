@@ -1,7 +1,7 @@
 import { updateJob } from "./db.js";
 import {
   arrayUnion,
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const WORKER_URL = "https://anchor-end-enquiry-handler.anchorendscreenprinting.workers.dev";
 
