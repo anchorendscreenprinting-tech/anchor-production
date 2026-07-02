@@ -438,12 +438,25 @@ export function renderJobDetail(job, container, onUpdate) {
           </button>
         ` : `<div class="job-complete-badge">✓ Job Complete</div>`}
         ${session.isAdmin ? `
+          ${job.stage > 1 ? `<button class="btn btn-ghost" id="back-stage-btn">← Back a stage</button>` : ""}
           <button class="btn btn-ghost" id="edit-job-btn">Edit</button>
           <button class="btn btn-danger" id="delete-job-btn">Delete</button>
         ` : ""}
       </div>
     </div>
   `;
+
+  // Back a stage (admin) — wired BEFORE the ink-stage early return below so it also
+  // works at Inks Mixed. Same confirm/behaviour as the board-card control; reuses backStage.
+  document.getElementById("back-stage-btn")?.addEventListener("click", async () => {
+    if (!confirm(`Move this job back to ${STAGES[job.stage - 1].label}?`)) return;
+    try {
+      await backStage(job.id);
+      onUpdate();
+    } catch (err) {
+      alert("Couldn't move the job back: " + err.message);
+    }
+  });
 
   // Ink prep checklist at Inks Mixed stage — read-only against the ink library; ticks
   // persist on the job so partial prep survives reloads. Advance is gated on all ticks.
