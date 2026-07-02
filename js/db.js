@@ -91,6 +91,25 @@ export async function markNotificationRead(notifId, userName) {
   return updateDoc(notifDoc(notifId), { readBy: arrayUnion(userName) });
 }
 
+// ── Recipe label requests (hq_recipe_requests) ───────────────────────────────
+// One-way "make this pot sticker" notification to HQ: created when a colour is
+// flagged in the Inks Mixed checklist, closed from HQ's Recipes inbox or auto-closed
+// when the colour is ticked as mixed. Nothing travels back to production.
+export const recipeReqsCol = () => collection(db, "hq_recipe_requests");
+
+export async function createRecipeRequest(data) {
+  return addDoc(recipeReqsCol(), { ...data, createdAt: serverTimestamp(), status: "open" });
+}
+
+// Close every open request for a job+colour (equality-only query — no composite index).
+export async function closeRecipeRequests(jobId, colour, by) {
+  const q = query(recipeReqsCol(),
+    where("jobId", "==", jobId), where("colour", "==", colour), where("status", "==", "open"));
+  const snap = await getDocs(q);
+  await Promise.all(snap.docs.map(d =>
+    updateDoc(d.ref, { status: "done", closedBy: by, closedAt: new Date().toISOString() })));
+}
+
 // ── Ink library (STRICTLY READ-ONLY) ─────────────────────────────────────────
 // anchor-production must never write inklib/state — the floor app owns that doc
 // (whole-doc last-writer-wins; see CLAUDE.md "Shared doc contract"). No write path

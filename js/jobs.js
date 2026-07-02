@@ -1,4 +1,4 @@
-import { createJob, updateJob, deleteJob, getJob, watchJobs, createNotification } from "./db.js";
+import { createJob, updateJob, deleteJob, getJob, watchJobs, createNotification, createRecipeRequest, closeRecipeRequests } from "./db.js";
 import { session } from "./auth.js";
 import { STAGES, STAGE_COLOURS } from "./config.js";
 import { renderInkChecklist, checkLowInks, loadInkState } from "./ink.js";
@@ -419,6 +419,21 @@ export function renderJobDetail(job, container, onUpdate) {
       onComplete: async () => {
         await advanceStage(job.id);
         onUpdate();
+      },
+      // "Needs recipe" → open a label request in hq_recipe_requests; unflagging or
+      // ticking the colour as mixed closes any open request for this job+colour.
+      onRecipeFlag: async (colour, flagged) => {
+        if (flagged) {
+          await createRecipeRequest({
+            jobId: job.id,
+            jobRef: job.quoteRef || job.id,
+            customerName: job.customerName ?? "",
+            colour,
+            by: session.user,
+          });
+        } else {
+          await closeRecipeRequests(job.id, colour, session.user);
+        }
       },
     });
     document.getElementById("advance-btn")?.remove();

@@ -81,7 +81,7 @@ function potsForColour(colour) {
   });
 }
 
-export function renderInkChecklist(container, job, user, { onPrepChange, onComplete }) {
+export function renderInkChecklist(container, job, user, { onPrepChange, onComplete, onRecipeFlag }) {
   loadInkState().then(() => {
     const colours = parseJobColours(job.inkColours);
     const existing = Array.isArray(job.inkPrep) ? job.inkPrep : [];
@@ -89,7 +89,10 @@ export function renderInkChecklist(container, job, user, { onPrepChange, onCompl
     // so an edited colour list adds/drops rows without losing existing ticks.
     const prep = colours.map(col => {
       const prev = existing.find(p => p.colour === col);
-      return { colour: col, done: !!(prev && prev.done), by: prev?.by ?? null, at: prev?.at ?? null };
+      return {
+        colour: col, done: !!(prev && prev.done), by: prev?.by ?? null, at: prev?.at ?? null,
+        recipeRequested: !!(prev && prev.recipeRequested),
+      };
     });
 
     const render = () => {
@@ -105,11 +108,14 @@ export function renderInkChecklist(container, job, user, { onPrepChange, onCompl
               : '<p class="ink-empty">No pots in stock — needs mixing.</p>';
             return `
               <div class="ink-section${p.done ? " ink-prep-done" : ""}">
-                <label class="ink-check-row">
-                  <input type="checkbox" class="ink-check" data-i="${i}" ${p.done ? "checked" : ""}>
-                  <span class="ink-check-colour">${p.colour}</span>
+                <div class="ink-check-row">
+                  <label class="ink-check-label">
+                    <input type="checkbox" class="ink-check" data-i="${i}" ${p.done ? "checked" : ""}>
+                    <span class="ink-check-colour">${p.colour}</span>
+                  </label>
                   ${p.done && p.by ? `<span class="ink-check-by">✓ ${p.by}</span>` : ""}
-                </label>
+                  ${!p.done ? `<button class="btn-recipe${p.recipeRequested ? " on" : ""}" data-ri="${i}" title="Ask HQ to print a recipe label for this pot">${p.recipeRequested ? "✓ Recipe requested" : "🏷 Needs recipe"}</button>` : ""}
+                </div>
                 <div class="ink-list">${potRows}</div>
               </div>`;
           }).join("") : '<p class="ink-empty">No ink colours listed on this job — nothing to prep.</p>'}
@@ -127,11 +133,30 @@ export function renderInkChecklist(container, job, user, { onPrepChange, onCompl
           p.done = e.target.checked;
           p.by = user;
           p.at = new Date().toISOString();
+          if (p.done) p.recipeRequested = false; // mixed — a label request is no longer needed
           render();
           try {
+            // Ticking mixed auto-closes any open recipe request for this job+colour,
+            // including ones flagged from another device.
+            if (p.done && onRecipeFlag) await onRecipeFlag(p.colour, false);
             await onPrepChange(prep.map(x => ({ ...x })));
           } catch (err) {
             alert("Couldn't save the tick — check your connection: " + err.message);
+          }
+        });
+      });
+
+      container.querySelectorAll(".btn-recipe").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          const p = prep[+e.currentTarget.dataset.ri];
+          const flagged = !p.recipeRequested;
+          p.recipeRequested = flagged;
+          render();
+          try {
+            if (onRecipeFlag) await onRecipeFlag(p.colour, flagged);
+            await onPrepChange(prep.map(x => ({ ...x })));
+          } catch (err) {
+            alert("Couldn't update the recipe request — check your connection: " + err.message);
           }
         });
       });

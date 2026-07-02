@@ -246,9 +246,12 @@ a { color: var(--accent); text-decoration: none; }
 .ink-save-btn:disabled { opacity: .45; cursor: not-allowed; }
 
 /* Ink prep checklist (read-only stock view + per-colour ticks) */
-.ink-check-row { display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 10px; }
+.ink-check-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.ink-check-label { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; }
 .ink-check { width: 20px; height: 20px; accent-color: var(--green); flex-shrink: 0; }
-.ink-check-colour { font-size: 14px; font-weight: 700; flex: 1; min-width: 0; }
+.ink-check-colour { font-size: 14px; font-weight: 700; min-width: 0; }
+.btn-recipe { font-size: 11px; padding: 4px 8px; border-radius: 99px; border: 1px solid var(--border); background: var(--surface-3); color: var(--text-2); cursor: pointer; white-space: nowrap; }
+.btn-recipe.on { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
 .ink-check-by { font-size: 11px; color: var(--green); white-space: nowrap; }
 .ink-section.ink-prep-done { border-color: var(--green); background: var(--green-dim); }
 .ink-shelf { font-size: 11px; color: var(--text-3); white-space: nowrap; }
