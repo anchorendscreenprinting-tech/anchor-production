@@ -98,6 +98,28 @@ export async function advanceStage(jobId, extraData = {}) {
   return nextStage;
 }
 
+// ── Move a job back one stage (admin only, floor at stage 1) ─────────────────
+// Mirror of advanceStage: same stageHistory entry shape, label annotated so the
+// audit trail shows it was a reversal, not a re-advance.
+export async function backStage(jobId) {
+  const job = await getJob(jobId);
+  if (!job) throw new Error("Job not found");
+  if (job.stage <= 1) throw new Error("Can't go back further than " + STAGES[1].label);
+
+  const prevStage = job.stage - 1;
+  const historyEntry = {
+    stage: prevStage, label: STAGES[prevStage].label + " (moved back)",
+    by: session.user, at: new Date().toISOString(),
+  };
+
+  await updateJob(jobId, {
+    stage: prevStage,
+    stageHistory: [...(job.stageHistory ?? []), historyEntry],
+  });
+
+  return prevStage;
+}
+
 // ── Update garment counts ─────────────────────────────────────────────────────
 export async function updateCounts(jobId, counts) {
   const job = await getJob(jobId);
@@ -157,6 +179,21 @@ export function renderBoard(jobs, container, onSelectJob) {
       if (job) onSelectJob(job);
     });
   });
+
+  // Admin back-a-stage on the card — stopPropagation so the card click doesn't open detail
+  container.querySelectorAll("[data-back-id]").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const job = active.find(j => j.id === btn.dataset.backId);
+      if (!job || job.stage <= 1) return;
+      if (!confirm(`Move this job back to ${STAGES[job.stage - 1].label}?`)) return;
+      try {
+        await backStage(job.id);
+      } catch (err) {
+        alert("Couldn't move the job back: " + err.message);
+      }
+    });
+  });
 }
 
 function jobCard(job) {
@@ -176,6 +213,7 @@ function jobCard(job) {
       </div>
       ${prep.length ? `<div class="job-ink-prep${prepDone === prep.length ? " done" : ""}">Inks prepped: ${prepDone}/${prep.length}</div>` : ""}
       ${low.length ? `<div class="job-ink-warn">⚠ Low ink: ${low.map(i => i.code).join(", ")}</div>` : ""}
+      ${session.isAdmin && job.stage > 1 ? `<button class="btn-stage-back" data-back-id="${job.id}" title="Admin: move this job back one stage">← Back a stage</button>` : ""}
     </div>
   `;
 }
