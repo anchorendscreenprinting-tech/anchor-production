@@ -1,7 +1,7 @@
 import { createJob, updateJob, deleteJob, getJob, watchJobs, createNotification } from "./db.js";
 import { session } from "./auth.js";
 import { STAGES, STAGE_COLOURS } from "./config.js";
-import { renderInkPicker, checkLowInks, loadInkState } from "./ink.js";
+import { renderInkChecklist, checkLowInks, loadInkState } from "./ink.js";
 import { showMockupModal } from "./mockup.js";
 
 // ── Anchor End HQ (Mockup Maker) deploy URL ───────────────────────────────────
@@ -161,6 +161,8 @@ export function renderBoard(jobs, container, onSelectJob) {
 
 function jobCard(job) {
   const low = checkLowInks(job.inkColours ?? job.notes ?? "");
+  const prep = Array.isArray(job.inkPrep) ? job.inkPrep : [];
+  const prepDone = prep.filter(p => p.done).length;
   return `
     <div class="job-card" data-id="${job.id}">
       <div class="job-card-header">
@@ -172,6 +174,7 @@ function jobCard(job) {
         <span>${job.colours ?? 1} col · ${job.screenCount ?? 1} screens</span>
         ${job.garmentColour ? `<span class="job-colour-dot" title="${job.garmentColour}">●</span>` : ""}
       </div>
+      ${prep.length ? `<div class="job-ink-prep${prepDone === prep.length ? " done" : ""}">Inks prepped: ${prepDone}/${prep.length}</div>` : ""}
       ${low.length ? `<div class="job-ink-warn">⚠ Low ink: ${low.map(i => i.code).join(", ")}</div>` : ""}
     </div>
   `;
@@ -404,16 +407,19 @@ export function renderJobDetail(job, container, onUpdate) {
     </div>
   `;
 
-  // Ink picker at Inks Mixed stage
+  // Ink prep checklist at Inks Mixed stage — read-only against the ink library; ticks
+  // persist on the job so partial prep survives reloads. Advance is gated on all ticks.
   if (isInkStage) {
     const inkContainer = document.getElementById("ink-picker-container");
-    renderInkPicker(inkContainer, job.inkColours, async (selected) => {
-      const inkUsage = [...(job.inkUsage ?? []), ...selected.map(s => ({
-        code: s.code, name: s.name, amount: s.amount,
-        loggedBy: session.user, loggedAt: new Date().toISOString(),
-      }))];
-      await advanceStage(job.id, { inkUsage });
-      onUpdate();
+    renderInkChecklist(inkContainer, job, session.user, {
+      onPrepChange: async (inkPrep) => {
+        await updateJob(job.id, { inkPrep });
+        job.inkPrep = inkPrep;
+      },
+      onComplete: async () => {
+        await advanceStage(job.id);
+        onUpdate();
+      },
     });
     document.getElementById("advance-btn")?.remove();
     return;

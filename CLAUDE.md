@@ -26,15 +26,14 @@ Other infra: Netlify (hosting), a Cloudflare Worker (`anchor-end-enquiry-handler
 - **Port, don't reinvent.** The retired anchor-end prototype holds proven logic; port it, only rewriting the data layer for Firebase.
 - **Report before building** when reconciling two systems or when a decision has real consequences.
 
-## Shared doc contract: `inklib/state` (this app writes it — read before touching ink code)
+## Shared doc contract: `inklib/state` (READ-ONLY for this app)
 
-The ink-library floor app stores its ENTIRE state in one Firestore document, **`inklib/state`**, rewritten wholesale on every save — whole-doc `setDoc`, **last-writer-wins, no field merge**. anchor-production also writes this doc: `deductInkStock()` (`js/db.js`) subtracts ink weights at the "Inks mixed" stage. Rules for any code that touches it:
+The ink-library floor app stores its ENTIRE state in one Firestore document, **`inklib/state`**, rewritten wholesale on every save — whole-doc `setDoc`, **last-writer-wins, no field merge**. A write from anywhere else can silently erase concurrent floor saves.
 
-- **Writes MUST go through `runTransaction`** — read fresh inside the transaction, mutate that read, write it back. A plain `getDoc` → `setDoc` silently clobbers any floor save that lands in between.
-- **Preserve `appVersion` exactly as read.** The Firestore rule on `inklib/state` (version-controlled in `anchor-hq/firestore.rules`) rejects any write where `appVersion` is missing, non-numeric, or lower than the stored value. Round-trip it; never invent or drop it.
-- **Address pots by their stable `id` field, NEVER by array index.** Indexes shift whenever the floor adds, deletes, or combines pots. If an id no longer exists at transaction time, skip that deduction and tell the user — never guess.
-- **Real field shapes** (verified against ink-library's `actions.js` — re-check there before trusting anything else, including this doc): **all ink types store their shelf in `loc`; nothing stores `shelf`.** `pantone`: `{ id, code, name, weight, loc, reorder:boolean, … }`. `base`: `{ id, name, weight, loc, reorder:boolean }`. `rio`: `{ id, name, openWeight, reserveTubs, loc }` — **no `weight` field (deduct `openWeight`) and no `reorder` field at all.** Where `reorder` exists it is a **boolean flag, not a numeric threshold** (this app's LOW logic uses `LOW_THRESHOLD_G` in `js/ink.js`).
-- **The `appVersion` guard blocks old CODE, not stale DATA.** Two same-version clients can still last-writer-wins clobber each other; a monotonic `revision` field enforced in rules is roadmapped. Until then, a transaction is the only protection this app has.
+- **anchor-production is READ-ONLY on `inklib/state` — no write path exists, and none should be added.** (Product decision, July 2026: the old `deductInkStock()` was removed. The "Inks Mixed" stage is a mix-readiness checklist — it shows required colours against current stock and persists ticks on the job's own `production_jobs` doc via `inkPrep`. Actual stock movements are logged in the floor app only.)
+- **Reads: the real field shapes** (verified against ink-library's `actions.js` — re-check there before trusting anything else, including this doc): **all ink types store their shelf in `loc`; nothing stores `shelf`.** `pantone`: `{ id, code, name, weight, loc, reorder:boolean, … }`. `base`: `{ id, name, weight, loc, reorder:boolean }`. `rio`: `{ id, name, openWeight, reserveTubs, loc }` — **no `weight` field (open-tub stock is `openWeight`) and no `reorder` field at all.** Where `reorder` exists it is a **boolean flag, not a numeric threshold** (this app's LOW logic uses `LOW_THRESHOLD_G` in `js/ink.js`).
+- **Reference pots by their stable `id` field, never by array index** — indexes shift whenever the floor adds, deletes, or combines pots.
+- Context if a write path is ever reconsidered (don't): the doc's `appVersion` field is rule-guarded (`anchor-hq/firestore.rules` rejects writes where it's missing, non-numeric, or lower than stored), any write must be a `runTransaction`, and the guard still wouldn't stop same-version last-writer-wins clobbering — a monotonic `revision` field is roadmapped. The clean answer is: this app doesn't write the doc.
 
 ## Hard-won gotchas (do not relearn these)
 

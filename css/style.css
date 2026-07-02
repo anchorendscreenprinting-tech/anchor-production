@@ -243,6 +243,17 @@ a { color: var(--accent); text-decoration: none; }
 .ink-amount-input:focus { outline: none; border-color: var(--accent); }
 .ink-unit { font-size: 11px; color: var(--text-3); }
 .ink-save-btn { align-self: flex-start; }
+.ink-save-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Ink prep checklist (read-only stock view + per-colour ticks) */
+.ink-check-row { display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 10px; }
+.ink-check { width: 20px; height: 20px; accent-color: var(--green); flex-shrink: 0; }
+.ink-check-colour { font-size: 14px; font-weight: 700; flex: 1; min-width: 0; }
+.ink-check-by { font-size: 11px; color: var(--green); white-space: nowrap; }
+.ink-section.ink-prep-done { border-color: var(--green); background: var(--green-dim); }
+.ink-shelf { font-size: 11px; color: var(--text-3); white-space: nowrap; }
+.job-ink-prep { margin-top: 6px; font-size: 10px; color: var(--text-2); background: var(--surface-3); border-radius: 4px; padding: 3px 6px; }
+.job-ink-prep.done { color: var(--green); background: var(--green-dim); }
 
 /* ── Customers ─────────────────────────────────────────────────────────────── */
 .customer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 16px; }

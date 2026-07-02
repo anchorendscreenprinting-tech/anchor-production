@@ -2,7 +2,6 @@ import { initializeApp }                          from "https://www.gstatic.com/
 import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc,
   updateDoc, deleteDoc, onSnapshot, query, orderBy, where, serverTimestamp, arrayUnion,
-  runTransaction,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js";
 import { FIREBASE_CONFIG, INK_LIB_DOC }           from "./config.js";
@@ -92,32 +91,11 @@ export async function markNotificationRead(notifId, userName) {
   return updateDoc(notifDoc(notifId), { readBy: arrayUnion(userName) });
 }
 
-// ── Ink library (read + deduct) ──────────────────────────────────────────────
+// ── Ink library (STRICTLY READ-ONLY) ─────────────────────────────────────────
+// anchor-production must never write inklib/state — the floor app owns that doc
+// (whole-doc last-writer-wins; see CLAUDE.md "Shared doc contract"). No write path
+// exists here and none should be added.
 export async function getInkLibState() {
   const snap = await getDoc(doc(db, INK_LIB_DOC.collection, INK_LIB_DOC.doc));
   return snap.exists() ? snap.data() : null;
-}
-
-export async function deductInkStock(updates) {
-  // updates: [{ type: "pantone"|"rio"|"base", id, amount }]
-  // Whole-doc transaction: read fresh inside, deduct by stable pot id, write back with
-  // appVersion exactly as read (the inklib/state rule rejects writes that drop or lower
-  // it). Rio pots track openWeight, not weight. Pots whose id no longer exists at
-  // transaction time are skipped, never guessed — returns the skipped updates.
-  const ref = doc(db, INK_LIB_DOC.collection, INK_LIB_DOC.doc);
-  let skipped = [];
-  await runTransaction(db, async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists()) throw new Error("Ink library not found");
-    const state = snap.data();
-    skipped = [];
-    for (const u of updates) {
-      const item = (state[u.type] ?? []).find((i) => i && i.id && i.id === u.id);
-      if (!item) { skipped.push(u); continue; }
-      const field = u.type === "rio" ? "openWeight" : "weight";
-      item[field] = Math.max(0, (item[field] ?? 0) - u.amount);
-    }
-    tx.set(ref, state);
-  });
-  return skipped;
 }

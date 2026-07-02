@@ -1,4 +1,4 @@
-import { getInkLibState, deductInkStock } from "./db.js";
+import { getInkLibState } from "./db.js";
 
 // A pot is LOW when its reorder flag is set (boolean in ink-library) or its weight is at
 // or below this. Tune here.
@@ -57,122 +57,104 @@ export function getAllInks() {
   return inks;
 }
 
-// Render an ink picker for the "Inks Mixed" stage
-export function renderInkPicker(container, jobColours, onSave) {
-  loadInkState().then(() => {
-    const inks = getAllInks();
-    const pantoneInks = inks.filter(i => i.type === "pantone");
-    const rioInks     = inks.filter(i => i.type === "rio");
-    const baseInks    = inks.filter(i => i.type === "base");
+// ── Mix-readiness checklist for the "Inks Mixed" stage ───────────────────────
+// anchor-production is READ-ONLY on inklib/state: this shows the job's required
+// colours against current stock so staff can prep ahead — mix or locate each colour,
+// tick it off. It never writes to the ink library; actual stock movements are logged
+// in the floor app. Ticks persist on the job (inkPrep on production_jobs) via the
+// onPrepChange callback — jobs.js owns that write.
 
-    container.innerHTML = `
-      <div class="ink-picker">
-        <h3 class="ink-picker-title">Log Inks Used</h3>
-        <p class="ink-picker-sub">
-          Job colours: <strong>${jobColours || "—"}</strong>
-        </p>
+export function parseJobColours(inkColours) {
+  return String(inkColours ?? "").split(/[,;\n/]+/).map(s => s.trim()).filter(Boolean);
+}
 
-        <div class="ink-section">
-          <div class="ink-section-header">Pantone / Custom</div>
-          <div class="ink-search-wrap">
-            <input type="text" id="ink-search" class="ink-search" placeholder="Search Pantone code or name…">
-          </div>
-          <div class="ink-list" id="pantone-list">
-            ${renderInkRows(pantoneInks)}
-          </div>
-        </div>
-
-        <div class="ink-section">
-          <div class="ink-section-header">Rio Colours</div>
-          <div class="ink-list">
-            ${renderInkRows(rioInks)}
-          </div>
-        </div>
-
-        <div class="ink-section">
-          <div class="ink-section-header">Base Inks</div>
-          <div class="ink-list">
-            ${renderInkRows(baseInks)}
-          </div>
-        </div>
-
-        <button class="btn btn-primary ink-save-btn" id="ink-save">
-          Save & Deduct Stock
-        </button>
-      </div>
-    `;
-
-    // Search filter for pantone
-    document.getElementById("ink-search").addEventListener("input", (e) => {
-      const q = e.target.value.toLowerCase();
-      document.querySelectorAll("#pantone-list .ink-row").forEach(row => {
-        const text = row.dataset.search ?? "";
-        row.style.display = text.includes(q) ? "" : "none";
-      });
-    });
-
-    // Save button
-    document.getElementById("ink-save").addEventListener("click", async () => {
-      const selected = [];
-      container.querySelectorAll(".ink-amount-input").forEach(input => {
-        const val = parseFloat(input.value);
-        if (val > 0) {
-          selected.push({
-            type: input.dataset.type,
-            id: input.dataset.id,
-            code: input.dataset.code,
-            name: input.dataset.name,
-            amount: val,
-          });
-        }
-      });
-      if (selected.length === 0) {
-        alert("Enter an amount for at least one ink.");
-        return;
-      }
-      try {
-        const skipped = await deductInkStock(selected.map(s => ({ type: s.type, id: s.id, amount: s.amount })));
-        // Pots deleted/combined on the floor since the picker loaded: not deducted, not
-        // logged on the job — tell the user instead of guessing.
-        const applied = selected.filter(s => !skipped.some(k => k.type === s.type && k.id === s.id));
-        if (skipped.length) {
-          const names = selected
-            .filter(s => skipped.some(k => k.type === s.type && k.id === s.id))
-            .map(s => s.code || s.name).join(", ");
-          alert(`Not deducted — these pots are no longer in the ink library (deleted or combined): ${names}.\n\nReopen this stage to see the current list.`);
-        }
-        if (applied.length) onSave(applied);
-      } catch (e) {
-        alert("Failed to deduct stock: " + e.message);
-      }
-    });
+// Loose display-aid match of a job colour ("PMS 286", "white") to pots in stock.
+const _compact = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+function potsForColour(colour) {
+  const c = _compact(String(colour).replace(/^\s*(pantone|pms)\s*/i, ""));
+  if (!c) return [];
+  return getAllInks().filter(ink => {
+    const code = _compact(ink.code);
+    const name = _compact(ink.name);
+    return (code !== "" && (code.startsWith(c) || c.startsWith(code))) ||
+           (name !== "" && (name.includes(c) || c.includes(name)));
   });
 }
 
-function renderInkRows(inks) {
-  if (!inks.length) return '<p class="ink-empty">None found</p>';
-  return inks.map(ink => `
-    <div class="ink-row${ink.low ? " ink-low" : ""}" data-search="${(ink.code + " " + ink.name).toLowerCase()}">
+export function renderInkChecklist(container, job, user, { onPrepChange, onComplete }) {
+  loadInkState().then(() => {
+    const colours = parseJobColours(job.inkColours);
+    const existing = Array.isArray(job.inkPrep) ? job.inkPrep : [];
+    // Rebuild from the job's colour list each time, carrying ticks over by colour text —
+    // so an edited colour list adds/drops rows without losing existing ticks.
+    const prep = colours.map(col => {
+      const prev = existing.find(p => p.colour === col);
+      return { colour: col, done: !!(prev && prev.done), by: prev?.by ?? null, at: prev?.at ?? null };
+    });
+
+    const render = () => {
+      const allDone = prep.every(p => p.done);
+      container.innerHTML = `
+        <div class="ink-picker">
+          <h3 class="ink-picker-title">Ink Prep</h3>
+          <p class="ink-picker-sub">Tick each colour once it's mixed or located. Stock is read-only here — log actual usage in the Ink Library app.</p>
+          ${prep.length ? prep.map((p, i) => {
+            const pots = potsForColour(p.colour);
+            const potRows = pots.length
+              ? pots.map(potRow).join("")
+              : '<p class="ink-empty">No pots in stock — needs mixing.</p>';
+            return `
+              <div class="ink-section${p.done ? " ink-prep-done" : ""}">
+                <label class="ink-check-row">
+                  <input type="checkbox" class="ink-check" data-i="${i}" ${p.done ? "checked" : ""}>
+                  <span class="ink-check-colour">${p.colour}</span>
+                  ${p.done && p.by ? `<span class="ink-check-by">✓ ${p.by}</span>` : ""}
+                </label>
+                <div class="ink-list">${potRows}</div>
+              </div>`;
+          }).join("") : '<p class="ink-empty">No ink colours listed on this job — nothing to prep.</p>'}
+          <button class="btn btn-primary ink-save-btn" id="ink-advance" ${prep.length && !allDone ? "disabled" : ""}>
+            ${prep.length && !allDone
+              ? `Tick all ${prep.length} colour${prep.length > 1 ? "s" : ""} to advance`
+              : "✓ Inks ready — advance stage"}
+          </button>
+        </div>
+      `;
+
+      container.querySelectorAll(".ink-check").forEach(cb => {
+        cb.addEventListener("change", async (e) => {
+          const p = prep[+e.target.dataset.i];
+          p.done = e.target.checked;
+          p.by = user;
+          p.at = new Date().toISOString();
+          render();
+          try {
+            await onPrepChange(prep.map(x => ({ ...x })));
+          } catch (err) {
+            alert("Couldn't save the tick — check your connection: " + err.message);
+          }
+        });
+      });
+
+      document.getElementById("ink-advance")?.addEventListener("click", () => onComplete());
+    };
+
+    render();
+  });
+}
+
+function potRow(ink) {
+  return `
+    <div class="ink-row${ink.low ? " ink-low" : ""}">
       <div class="ink-row-info">
         <span class="ink-code">${ink.code}</span>
         <span class="ink-name">${ink.name !== ink.code ? ink.name : ""}</span>
         ${ink.low ? '<span class="ink-low-badge">LOW</span>' : ""}
         <span class="ink-weight">${gramsFmt(ink.weight)}</span>
-      </div>
-      <div class="ink-row-input">
-        <input
-          type="number" min="0" step="50"
-          class="ink-amount-input"
-          placeholder="g used"
-          data-type="${ink.type}"
-          data-id="${ink.id ?? ""}"
-          data-code="${ink.code}"
-          data-name="${ink.name}"
-        >
-        <span class="ink-unit">g</span>
+        ${ink.shelf ? `<span class="ink-shelf">${ink.shelf}</span>` : ""}
       </div>
     </div>
-  `).join("");
+  `;
 }
 
 // Check which inks are low that appear in a job's colour list
