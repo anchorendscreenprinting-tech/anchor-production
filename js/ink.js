@@ -1,5 +1,9 @@
 import { getInkLibState, deductInkStock } from "./db.js";
 
+// A pot is LOW when its reorder flag is set (boolean in ink-library) or its weight is at
+// or below this. Tune here.
+const LOW_THRESHOLD_G = 500;
+
 let _inkState = null;
 
 export async function loadInkState() {
@@ -14,34 +18,39 @@ export function getAllInks() {
   if (!_inkState) return [];
   const inks = [];
 
-  (_inkState.pantone ?? []).forEach((ink, i) => {
+  // Field shapes per ink-library (actions.js): pantone {id, code, weight, loc, reorder:bool},
+  // rio {id, name, openWeight, loc} (no weight, no reorder), base {id, name, weight, loc,
+  // reorder:bool}. Pots are addressed by stable id, never array index.
+  (_inkState.pantone ?? []).forEach((ink) => {
+    const weight = ink.weight ?? 0;
     inks.push({
-      type: "pantone", index: i,
+      type: "pantone", id: ink.id,
       code: ink.code, name: ink.name ?? ink.code,
-      weight: ink.weight ?? 0, threshold: ink.reorder ?? 500,
-      low: (ink.weight ?? 0) <= (ink.reorder ?? 500),
-      shelf: ink.shelf ?? "",
+      weight,
+      low: ink.reorder === true || weight <= LOW_THRESHOLD_G,
+      shelf: ink.loc ?? "",
     });
   });
 
-  (_inkState.rio ?? []).forEach((ink, i) => {
+  (_inkState.rio ?? []).forEach((ink) => {
+    const weight = ink.openWeight ?? 0;
     inks.push({
-      type: "rio", index: i,
+      type: "rio", id: ink.id,
       code: ink.code ?? ink.name, name: ink.name,
-      weight: ink.weight ?? 0, threshold: ink.reorder ?? 1000,
-      low: (ink.weight ?? 0) <= (ink.reorder ?? 1000),
-      shelf: ink.shelf ?? "",
+      weight,
+      low: ink.reorder === true || weight <= LOW_THRESHOLD_G,
+      shelf: ink.loc ?? "",
     });
   });
 
-  (_inkState.base ?? []).forEach((ink, i) => {
-    const threshold = ink.reorder ?? 2500;
+  (_inkState.base ?? []).forEach((ink) => {
+    const weight = ink.weight ?? ink.current ?? 0;
     inks.push({
-      type: "base", index: i,
+      type: "base", id: ink.id,
       code: ink.name, name: ink.name,
-      weight: ink.weight ?? ink.current ?? 0, threshold,
-      low: (ink.weight ?? ink.current ?? 0) <= threshold,
-      shelf: "",
+      weight,
+      low: ink.reorder === true || weight <= LOW_THRESHOLD_G,
+      shelf: ink.loc ?? "",
     });
   });
 
@@ -110,7 +119,7 @@ export function renderInkPicker(container, jobColours, onSave) {
         if (val > 0) {
           selected.push({
             type: input.dataset.type,
-            index: parseInt(input.dataset.index),
+            id: input.dataset.id,
             code: input.dataset.code,
             name: input.dataset.name,
             amount: val,
@@ -122,8 +131,17 @@ export function renderInkPicker(container, jobColours, onSave) {
         return;
       }
       try {
-        await deductInkStock(selected.map(s => ({ type: s.type, index: s.index, amount: s.amount })));
-        onSave(selected);
+        const skipped = await deductInkStock(selected.map(s => ({ type: s.type, id: s.id, amount: s.amount })));
+        // Pots deleted/combined on the floor since the picker loaded: not deducted, not
+        // logged on the job — tell the user instead of guessing.
+        const applied = selected.filter(s => !skipped.some(k => k.type === s.type && k.id === s.id));
+        if (skipped.length) {
+          const names = selected
+            .filter(s => skipped.some(k => k.type === s.type && k.id === s.id))
+            .map(s => s.code || s.name).join(", ");
+          alert(`Not deducted — these pots are no longer in the ink library (deleted or combined): ${names}.\n\nReopen this stage to see the current list.`);
+        }
+        if (applied.length) onSave(applied);
       } catch (e) {
         alert("Failed to deduct stock: " + e.message);
       }
@@ -147,7 +165,7 @@ function renderInkRows(inks) {
           class="ink-amount-input"
           placeholder="g used"
           data-type="${ink.type}"
-          data-index="${ink.index}"
+          data-id="${ink.id ?? ""}"
           data-code="${ink.code}"
           data-name="${ink.name}"
         >
@@ -161,12 +179,13 @@ function renderInkRows(inks) {
 export function checkLowInks(jobColourNotes) {
   if (!_inkState || !jobColourNotes) return [];
   const notes = jobColourNotes.toLowerCase();
-  return getAllInks().filter(ink =>
-    ink.low && (
-      notes.includes(ink.code.toLowerCase()) ||
-      notes.includes((ink.name ?? "").toLowerCase())
-    )
-  );
+  return getAllInks().filter(ink => {
+    if (!ink.low) return false;
+    // Empty strings must never match — "".includes("") is true for everything.
+    const code = (ink.code ?? "").toLowerCase();
+    const name = (ink.name ?? "").toLowerCase();
+    return (code !== "" && notes.includes(code)) || (name !== "" && notes.includes(name));
+  });
 }
 
 function gramsFmt(g) {

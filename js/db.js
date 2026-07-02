@@ -2,6 +2,7 @@ import { initializeApp }                          from "https://www.gstatic.com/
 import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc,
   updateDoc, deleteDoc, onSnapshot, query, orderBy, where, serverTimestamp, arrayUnion,
+  runTransaction,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js";
 import { FIREBASE_CONFIG, INK_LIB_DOC }           from "./config.js";
@@ -98,15 +99,25 @@ export async function getInkLibState() {
 }
 
 export async function deductInkStock(updates) {
-  // updates: [{ type: "pantone"|"rio"|"base", index, amount }]
-  const snap = await getDoc(doc(db, INK_LIB_DOC.collection, INK_LIB_DOC.doc));
-  if (!snap.exists()) throw new Error("Ink library not found");
-  const state = snap.data();
-  for (const u of updates) {
-    const arr = state[u.type];
-    if (arr && arr[u.index] != null) {
-      arr[u.index].weight = Math.max(0, (arr[u.index].weight ?? 0) - u.amount);
+  // updates: [{ type: "pantone"|"rio"|"base", id, amount }]
+  // Whole-doc transaction: read fresh inside, deduct by stable pot id, write back with
+  // appVersion exactly as read (the inklib/state rule rejects writes that drop or lower
+  // it). Rio pots track openWeight, not weight. Pots whose id no longer exists at
+  // transaction time are skipped, never guessed — returns the skipped updates.
+  const ref = doc(db, INK_LIB_DOC.collection, INK_LIB_DOC.doc);
+  let skipped = [];
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error("Ink library not found");
+    const state = snap.data();
+    skipped = [];
+    for (const u of updates) {
+      const item = (state[u.type] ?? []).find((i) => i && i.id && i.id === u.id);
+      if (!item) { skipped.push(u); continue; }
+      const field = u.type === "rio" ? "openWeight" : "weight";
+      item[field] = Math.max(0, (item[field] ?? 0) - u.amount);
     }
-  }
-  await setDoc(doc(db, INK_LIB_DOC.collection, INK_LIB_DOC.doc), state);
+    tx.set(ref, state);
+  });
+  return skipped;
 }
