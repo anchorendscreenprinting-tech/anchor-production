@@ -446,6 +446,20 @@ export function renderJobDetail(job, container, onUpdate) {
     </div>
   `;
 
+  // Edit / Delete (admin) — wired BEFORE the ink-stage early return below; previously
+  // wired after it, which left both buttons dead on jobs at Inks Mixed.
+  if (session.isAdmin) {
+    document.getElementById("edit-job-btn")?.addEventListener("click", () => {
+      showJobForm(job, onUpdate);
+    });
+    document.getElementById("delete-job-btn")?.addEventListener("click", async () => {
+      if (confirm(`Delete job for ${job.customerName}? This cannot be undone.`)) {
+        await deleteJob(job.id);
+        onUpdate();
+      }
+    });
+  }
+
   // Back a stage (admin) — wired BEFORE the ink-stage early return below so it also
   // works at Inks Mixed. Same confirm/behaviour as the board-card control; reuses backStage.
   document.getElementById("back-stage-btn")?.addEventListener("click", async () => {
@@ -508,18 +522,6 @@ export function renderJobDetail(job, container, onUpdate) {
       alert(e.message);
     }
   });
-
-  if (session.isAdmin) {
-    document.getElementById("edit-job-btn")?.addEventListener("click", () => {
-      showJobForm(job, onUpdate);
-    });
-    document.getElementById("delete-job-btn")?.addEventListener("click", async () => {
-      if (confirm(`Delete job for ${job.customerName}? This cannot be undone.`)) {
-        await deleteJob(job.id);
-        onUpdate();
-      }
-    });
-  }
 
   // Send mockup button (stage 1 only)
   document.getElementById("send-mockup-btn")?.addEventListener("click", () => {
